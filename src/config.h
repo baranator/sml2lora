@@ -6,7 +6,7 @@
 #include <list>
 #include <regex.h>
 #include <stdio.h>
-
+#include "Sensor.h"
 
 
 #define LONG_STRING_LEN 128
@@ -16,6 +16,12 @@
 
 
 static char stypeVals[][STRING_LEN] = { "sml", "s0", "other" };
+void printHex2(unsigned v) {
+    v &= 0xff;
+    if (v < 16)
+        printD('0');
+    debugD("%x",v);
+}
 
 boolean isHexString(String s, uint8_t num_bytes){
   regex_t reegex;
@@ -33,17 +39,20 @@ boolean isHexString(String s, uint8_t num_bytes){
   return true;
 }
 
-bool formStringToByteArray(char* fs, uint8_t* bytearray, uint8_t num_bytes){
+bool formStringToByteArray(const char* fs, uint8_t* bytearray, uint8_t num_bytes){
     uint16_t s_len = strlen(fs);
-    for(int i=0;i<s_len;i++){
-        fs[i]=tolower(fs[i]);
-    }
 
-  //  DEBUG(fs);
-    
     if(s_len != 3*num_bytes-1){
         return false;
     }
+
+   // for(int i=0;i<s_len;i++){
+    //    fs[i]=tolower(fs[i]);
+    //}
+
+  //  DEBUG(fs);
+    
+
 
     for (int i = 0; i < num_bytes; i++) {
         sscanf( fs+ 3*i, "%2hhx", bytearray+i);
