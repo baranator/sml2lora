@@ -37,8 +37,7 @@ static osjob_t sendjob;
 const Arduino_LMIC::HalConfiguration_t myConfig;
 const lmic_pinmap *pPinMap = Arduino_LMIC::GetPinmap_ThisBoard();
 
-String wifi_ssid ;
-String wifi_psk ;
+
 
 DNSServer dnsServer;
 WebServer server(80);
@@ -48,16 +47,19 @@ IPAddress apIp(192, 168, 4, 1);
 unsigned long startup;
 boolean validConfig=false;
 const int led = 13;
-const unsigned long CONFIG_DUR=25000;
+const unsigned long CONFIG_DUR_MS=25000;
 const uint16_t DEFAULT_TIME_TO_SLEEP_M=30;
+
+String stolower(String s){
+  s.toLowerCase();
+  return s;
+}
 
 //static const u1_t PROGMEM APPEUI[8]={ 0x77, 0x6D, 0x54, 0xDF, 0x56, 0x54, 0x54, 0x56 };
 //void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 void os_getArtEui (u1_t* buf) { 
   u1_t APPEUI[8];
-  String s=prefs.getString("lora_app_eui", "");
-  s.toLowerCase();
-  formStringToByteArray(s.c_str(), APPEUI, 8);
+  formStringToByteArray(stolower(prefs.getString("lora_app_eui", "")).c_str(), APPEUI, 8);
   memcpy(buf, APPEUI, 8);
 }
 
@@ -67,9 +69,7 @@ void os_getArtEui (u1_t* buf) {
 //void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 void os_getDevEui (u1_t* buf) { 
   u1_t DEVEUI[8];
-  String s=prefs.getString("lora_dev_eui", "");
-  s.toLowerCase();
-  formStringToByteArray(s.c_str(), DEVEUI, 8);
+  formStringToByteArray(stolower(prefs.getString("lora_dev_eui", "")).c_str(), DEVEUI, 8);
   memcpy(buf, DEVEUI, 8);
 }
 
@@ -81,11 +81,10 @@ void os_getDevEui (u1_t* buf) {
 
 void os_getDevKey (u1_t* buf) {  
   u1_t APPKEY[16];
-  String s=prefs.getString("lora_app_key", "");
-  s.toLowerCase();
-  formStringToByteArray(s.c_str(), APPKEY, 16);
+  formStringToByteArray(stolower(prefs.getString("lora_app_key", "")).c_str(), APPKEY, 16);
   memcpy(buf, APPKEY, 16);
 }
+
 
 
 String get_ssid(){
@@ -94,43 +93,39 @@ String get_ssid(){
   String mac=WiFi.macAddress();
   return  ssid+mac.substring(12);
 }
+
 String get_psk(){
   return prefs.getString("wifi_psk", "sml-to-lora");
 }
 
 void fillbufferwithu32(uint32_t v, uint8_t start){
-    start+=1; //reserve one byte at the beginning for indication of given values as a mask
-    loraSendBuffer[start+0] = v & 0xFF; // 0x78
-    loraSendBuffer[start+1] = (v >> 8) & 0xFF; // 0x56
-    loraSendBuffer[start+2] = (v >> 16) & 0xFF; // 0x34
-    loraSendBuffer[start+3] = (v >> 24) & 0xFF; // 0x12
+  start+=1; //reserve one byte at the beginning for indication of given values as a mask
+  loraSendBuffer[start+0] = v & 0xFF; // 0x78
+  loraSendBuffer[start+1] = (v >> 8) & 0xFF; // 0x56
+  loraSendBuffer[start+2] = (v >> 16) & 0xFF; // 0x34
+  loraSendBuffer[start+3] = (v >> 24) & 0xFF; // 0x12
 
-    debugD("Filled sendbuffer: %x %x %x %x",loraSendBuffer[start+0],loraSendBuffer[start+1],loraSendBuffer[start+2],loraSendBuffer[start+3]);
+  debugD("Filled sendbuffer: %x %x %x %x",loraSendBuffer[start+0],loraSendBuffer[start+1],loraSendBuffer[start+2],loraSendBuffer[start+3]);
 }
 
 void do_send(osjob_t* j){
-    // Check if there is not a current TX/RX job running
-    if (LMIC.opmode & OP_TXRXPEND) {
-        printlnD(F("OP_TXRXPEND, not sending"));
-    } else {
-        // Prepare upstream data transmission at the next possible time.
-        LMIC_setTxData2(1, loraSendBuffer, loraSendBufferSize, 0);
-        printlnD(F("Packet queued"));
-    }
-    // Next TX is scheduled after TX_COMPLETE event.
+  // Check if there is not a current TX/RX job running
+  if (LMIC.opmode & OP_TXRXPEND) {
+    printlnD(F("OP_TXRXPEND, not sending"));
+  } else {
+    // Prepare upstream data transmission at the next possible time.
+    LMIC_setTxData2(1, loraSendBuffer, loraSendBufferSize, 0);
+    printlnD(F("Packet queued"));
+  }
+  // Next TX is scheduled after TX_COMPLETE event.
 }
 
 
 void doSleep(){
-    uint16_t tts=prefs.getUInt("sleep_m", DEFAULT_TIME_TO_SLEEP_M);
-    esp_sleep_enable_timer_wakeup( tts * 60 * 1000000ULL);
-    debugD("Setup ESP32 to sleep for every %d Seconds. Going to sleep now.", tts);
-    esp_deep_sleep_start();
-}
-
-void doLora(){
-
-   doSleep();
+  uint16_t tts=prefs.getUInt("sleep_m", DEFAULT_TIME_TO_SLEEP_M);
+  esp_sleep_enable_timer_wakeup( tts * 60 * 1000000ULL);
+  debugD("Setup ESP32 to sleep for every %d Seconds. Going to sleep now.", tts);
+  esp_deep_sleep_start();
 }
 
 
@@ -152,12 +147,7 @@ boolean publish(Sensor *sensor, sml_file *file){
                     entry->obj_name->str[0], entry->obj_name->str[1],
                     entry->obj_name->str[2], entry->obj_name->str[3],
                     entry->obj_name->str[4], entry->obj_name->str[5]);
-
-               // String obisIds[]={"1-0:1.8.0","1-0:2.8.0"};
-
                 
-                
-
                 int o=0;
                   for (std::list<String>::iterator it = obisIds.begin(); it != obisIds.end(); ++it, o++){
                     debugD("%s arrived " ,obisIdentifier);
@@ -178,6 +168,8 @@ boolean publish(Sensor *sensor, sml_file *file){
                             // this allows vals from 0 to 429496729,5 to be stored
                             intval=abs(round(value*10));
                             fillbufferwithu32(intval,o*4);  //4bytes for uint32t
+                            //lorasendbuff[0] stores a mask of the sent values 0010 means, that only the 3rd 32bit-pack has
+                            //a measured value, the other 32bit vals were not transmitted.
                             loraSendBuffer[0]= loraSendBuffer[0] | (uint8_t)(1 << o);
                             
 
@@ -334,8 +326,6 @@ void onEvent (ev_t ev) {
 }
 
 void smlAndLoraSetup(){
-
-
   static const SensorConfig* config = new SensorConfig{
     .pin = (uint8_t)atoi(prefs.getString("sml_pin", "").c_str()),
     .numeric_only = false
@@ -392,6 +382,7 @@ bool configValidator(ErrorMsgs* e=NULL){
   String opt1= "";
 
   String lobis=prefs.getString("sml_obis_ids", "");
+  debugD("obis: %s",lobis.c_str());
   if( !formObisToList(lobis, NULL)){
         em->sml_obis_ids = "Zu lesende OBIS-Ids durch Leerzeichen getrennt eingeben!";
         retval=false;  
@@ -402,34 +393,30 @@ bool configValidator(ErrorMsgs* e=NULL){
   //Sending interval
   String linterval=prefs.getString("sleep_m", ""+DEFAULT_TIME_TO_SLEEP_M);
   if(!isNumeric(linterval) || linterval.toInt()<5 ){
-      em->sleep_m= "Sendeintervall in  (min. 5) angeben";
+      em->sleep_m= "Zahl, min. 5 Minuten";
       retval=false;
   }
 
   //datapins
   String lpin=prefs.getString("sml_pin", "");
   if(!isNumeric(lpin)){
-      em->sml_pin = "Receive-Pin d. Lesekopfes eingeben ";
+      em->sml_pin = "Zahl, Receive-Pin d. Lesekopfes eingeben ";
       retval=false;
   }
-
-  return retval; 
-  
-    
-
-  
+  debugD("config is valid: %d",retval);
+  return retval;   
 }
 
 
 
 String genFormField(String name, String lbl, String val, String msg=""){
-  return "<tr><td>"+lbl+":</td><td><input type=\"text\" name=\""+name+"\" value=\""+val+"\"></td><td>"+msg+"</td></tr>";
+  return "<tr><td>"+lbl+":</td><td><input style=\"border: solid 2px "+((msg==0)?"black":"red")+"\" type=\"text\" name=\""+name+"\" value=\""+val+"\"></td><td>"+msg+"</td></tr>";
 }
 
 String genRootPage(ErrorMsgs* em){
   String page="<html><head></head><body>";
   page+= "<h1>sml2lora configuration</h1>";
-  page+= "<form method=\"post\" action=\"//"+apIp.toString()+"/save\"><table>";
+  page+= "<form method=\"post\" action=\"//"+apIp.toString()+"/\"><table>";
   page+= genFormField("wifi_psk", "wifi passphrase", get_psk(), em->wifi_psk);
   page+= genFormField("lora_dev_eui", "lora dev-EUI:<br>8 Byte, little-endian", prefs.getString("lora_dev_eui", ""), em->lora_dev_eui);
   page+= genFormField("lora_app_eui", "lora app-EUI:<br>8 Byte, little-endian", prefs.getString("lora_app_eui", ""), em->lora_app_eui);
@@ -445,6 +432,7 @@ String genRootPage(ErrorMsgs* em){
 void handleRoot() {
   printlnD("HANDLE: root");
   ErrorMsgs e;
+  validConfig = configValidator(&e);
   server.send(200, "text/html", genRootPage(&e));
 }
 
@@ -460,60 +448,55 @@ void handleSave(){
   }else{
     e.wifi_psk="unchanged, use more than 7 chars";  
   } 
-  prefs.putString("lora_dev_eui", server.arg("lora_dev_eui"));
+  prefs.putString("lora_dev_eui", stolower(server.arg("lora_dev_eui")));
+
   prefs.putString("lora_app_eui", server.arg("lora_app_eui"));
   prefs.putString("lora_app_key", server.arg("lora_app_key"));
   prefs.putString("sleep_m", server.arg("sleep_m"));
   prefs.putString("sml_obis_ids", server.arg("sml_obis_ids"));
+  //debugD("%s",server.arg("sml_obis_ids"));
   prefs.putString("sml_pin", server.arg("sml_pin"));
   
-  configValidator(&e);
+  validConfig=configValidator(&e);
   
   server.send(200, "text/html", genRootPage(&e));
 }
 
-
-
-
 void setup(void) {
   Serial.begin(115200);
+  debugSetLevel(DEBUG_LEVEL_VERBOSE);
   pinMode(led, OUTPUT);
   digitalWrite(led,LOW);
   startup = millis();
-  validConfig=configValidator();
-  debugSetLevel(DEBUG_LEVEL_VERBOSE);
+  
+  
   delay(200);
   
   printlnD("startup");
-
-  
   prefs.begin("sml2lora");
-
-
+validConfig=configValidator();
   if(esp_sleep_get_wakeup_cause()==ESP_SLEEP_WAKEUP_TIMER){
     //printD("woke up from sleep, doin stuff!");
     //DO LORA STUFF
     smlAndLoraSetup();
     
-    
   }else{
 
 
-  //Wifi-AP stuff
-  wifi_psk=get_psk();
-  wifi_ssid=get_ssid();
+    //Wifi-AP stuff
+    String wifi_ssid =get_ssid();
+    String wifi_psk =get_psk();
 
-  debugD("SSID: %s",wifi_ssid.c_str());
-  debugD("PASS: %s",wifi_psk.c_str());
-  
+    debugD("SSID: %s",wifi_ssid.c_str());
+    debugD("PASS: %s",wifi_psk.c_str());
   
 
-  WiFi.mode(WIFI_AP);
-  WiFi.softAPConfig(apIp, apIp, IPAddress(255, 255, 255, 0));
-  if (!WiFi.softAP(wifi_ssid, wifi_psk)) {
-    printlnD("Soft AP creation failed.");
-    while(1);
-  }
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(apIp, apIp, IPAddress(255, 255, 255, 0));
+    if (!WiFi.softAP(wifi_ssid, wifi_psk)) {
+      printlnD("Soft AP creation failed.");
+      while(1);
+    }
   
   
   debugD("AP @  %s", wifi_ssid.c_str());
@@ -521,8 +504,8 @@ void setup(void) {
   
   dnsServer.start(DNS_PORT, "*", apIp);
 
-  server.on("/", handleRoot);
-  server.on("/save", HTTP_POST, handleSave);
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/", HTTP_POST, handleSave);
   server.onNotFound(handleRoot);
   server.begin();
   } 
@@ -533,17 +516,19 @@ void smlAndLoraLoop(){
     os_runloop_once();
     //TODO: ensur, taht  loraInterval is bigger than the val timePassedMs is compared with
     unsigned long timePassedMs = millis()-tryingSince;
-    if(timePassedMs>2*60*1000){
+    //max timeout is a third of the sending interval
+    uint16_t maxtimeout_m=prefs.getString("sleep_m", ""+DEFAULT_TIME_TO_SLEEP_M).toInt()/3;
+    if(timePassedMs>maxtimeout_m*60*1000){
       doSleep();
     }
 }
 
-
+boolean setupdone=false;
 void loop(void) {
   debugHandle();
   delay(2);//allow the cpu to switch to other tasks
 
-  if(esp_sleep_get_wakeup_cause()==ESP_SLEEP_WAKEUP_TIMER){
+  if(esp_sleep_get_wakeup_cause()==ESP_SLEEP_WAKEUP_TIMER || setupdone){
     //printD("woke up from sleep, doin stuff!");
     //DO LORA STUFF
     //loraloopstuff!();
@@ -552,16 +537,17 @@ void loop(void) {
   }else{
       //printD("fresh boot");
       
-      if(millis()-startup<=CONFIG_DUR || WiFi.softAPgetStationNum()>0 || !validConfig){
+      if(millis()-startup<=CONFIG_DUR_MS || WiFi.softAPgetStationNum()>0 || !validConfig){
     
         dnsServer.processNextRequest();
         server.handleClient();
 
       }else{
-          printlnI("Time for config is over, shutting down AP");
+          printlnI("Time for config is over, config valid, shutting down AP");
           digitalWrite(led,HIGH);
           WiFi.softAPdisconnect(true);
-          doLora();
+          setupdone=true;
+          smlAndLoraSetup();
       }
   }
 

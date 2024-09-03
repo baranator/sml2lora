@@ -68,8 +68,11 @@ bool formObisToList(String fs, std::list<String> *slist){
     fs.toCharArray(buf, STRING_LEN);
     //regex for multiple, space separated obis identifier
     int v=regcomp( &reegex, "^([0-9]\\-[0-9]{1,2}:)?[0-9]\\.[0-9]\\.[0-9]( ([0-9]\\-[0-9]{1,2}:)?[0-9]\\.[0-9]\\.[0-9]){0,3}$", REG_EXTENDED | REG_NOSUB);
+    //int v=regcomp( &reegex, "^[0-9]\\.[0-9]\\.[0-9]( [0-9]\\.[0-9]\\.[0-9]){0,3}$", REG_EXTENDED | REG_NOSUB);
+
     if(regexec(&reegex, buf, 0, NULL, 0)!=0) {
-        printD("invalid data format for obis ids");
+        debugD("invalid data format for obis ids: %s",buf);
+
         retval=false;  
     }else{
         if(slist != NULL){
